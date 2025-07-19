@@ -1,160 +1,144 @@
-import React from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 
-/**
- * User interface representing the authenticated user's data
- * 
- * When integrating with Clerk or another auth provider:
- * 1. Update this interface to match the user object structure from your auth provider
- * 2. Add any additional fields needed by your application
- */
-interface User {
+interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: 'mentor' | 'mentee';
-  avatar: string;
+  role?: 'mentor' | 'mentee';
+  avatar?: string;
+  title?: string;
+  company?: string;
+  bio?: string;
+  skills?: string[];
+  rating?: number;
+  sessionCount?: number;
+  availability?: { days: string[]; timeSlots: { start: string; end: string }[] };
+  rate?: { amount: number; currency: string };
+  googleAccessToken?: string;
+  googleRefreshToken?: string;
 }
 
-/**
- * Authentication context interface defining the shape of the auth context
- * 
- * When integrating with Clerk or another auth provider:
- * 1. Update these methods to match the auth provider's API
- * 2. Add any additional methods needed (e.g., passwordReset, updateProfile)
- */
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: 'mentor' | 'mentee') => Promise<void>;
   logout: () => void;
 }
 
-// Create the auth context with undefined as default value
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Auth Provider component that manages authentication state
- * 
- * To integrate with Clerk:
- * 1. Replace this component with <ClerkProvider>
- * 2. Use Clerk's hooks (useAuth, useUser) instead of the custom hooks below
- * 3. Update the login, register, and logout methods to use Clerk's API
- */
+// Helper to set auth token in headers
+const setAuthToken = (token: string | null) => {
+  if (token) {
+    localStorage.setItem('token', token);
+  } else {
+    localStorage.removeItem('token');
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check if user is already logged in from localStorage
-  // When using Clerk, this would be handled by the Clerk provider
-  React.useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
+  const loadUser = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        // In a real app, you'd verify the token with your backend
+        // For this simplified example, we'll just assume the token is valid
+        // and extract user info if available (e.g., from a decoded JWT)
+        // For now, we'll just set isAuthenticated to true if a token exists
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Error loading user from token:', error);
+        setAuthToken(null);
+        setIsAuthenticated(false);
+      }
+    } else {
+      setIsAuthenticated(false);
     }
+    setIsLoading(false);
   }, []);
 
-  /**
-   * Mock login function - replace with actual API call
-   * 
-   * For Clerk integration:
-   * - Use Clerk's signIn method instead
-   * - Handle authentication tokens and session management
-   */
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
   const login = async (email: string, password: string) => {
-    // Mock login - in a real app, this would call an API
-    if (email && password) {
-      // REPLACE THIS: Call your authentication API here
-      // Example: const response = await api.post('/auth/login', { email, password });
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        if (user.email === email) {
-          setUser(user);
-          setIsAuthenticated(true);
-        } else {
-          throw new Error('Invalid credentials');
-        }
-      } else {
-        throw new Error('Invalid credentials');
-      }
-    } else {
-      throw new Error('Invalid credentials');
-    }
-  };
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-  /**
-   * Mock registration function - replace with actual API call
-   * 
-   * For Clerk integration:
-   * - Use Clerk's signUp method instead
-   * - Handle user creation and initial profile setup
-   */
-  const register = async (name: string, email: string, password: string, role: 'mentor' | 'mentee') => {
-    // Mock registration - in a real app, this would call an API
-    if (name && email && password && role) {
-      // REPLACE THIS: Call your registration API here
-      // Example: const response = await api.post('/auth/register', { name, email, password, role });
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        if (user.email === email) {
-          throw new Error('User already exists');
-        }
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || 'Login failed');
       }
-      
-      const mockUser: User = {
-        id: '1',
-        name,
-        email,
-        role,
-        avatar: `https://img.heroui.chat/image/avatar?w=200&h=200&u=${Math.floor(Math.random() * 100)}`
-      };
-      
-      setUser(mockUser);
+
+      setAuthToken(data.token);
+      setUser(data.user);
       setIsAuthenticated(true);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-    } else {
-      throw new Error('Invalid registration data');
+
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw error;
     }
   };
 
-  /**
-   * Logout function - clears user data and authentication state
-   * 
-   * For Clerk integration:
-   * - Use Clerk's signOut method instead
-   */
+  const register = async (name: string, email: string, password: string, role: 'mentor' | 'mentee') => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password, role }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || 'Registration failed');
+      }
+
+      setAuthToken(data.token);
+      setUser(data.user);
+      setIsAuthenticated(true);
+
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
-    // REPLACE THIS: Call your logout API here if needed
-    // Example: await api.post('/auth/logout');
-    
+    setAuthToken(null);
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('user');
   };
 
-  // Create the auth context value object with all methods and state
   const value = {
     user,
     isAuthenticated,
+    isLoading,
     login,
     register,
-    logout
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-/**
- * Custom hook to use the auth context
- * 
- * For Clerk integration:
- * - Replace with Clerk's useAuth or useUser hooks
- */
 export const useAuth = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

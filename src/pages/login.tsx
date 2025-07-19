@@ -1,46 +1,20 @@
 import React from 'react';
 import { useHistory, Link as RouterLink } from 'react-router-dom';
-import { Card, CardBody, Input, Button, Link, Checkbox, addToast } from '@heroui/react';
+import { Card, CardBody, Input, Button, Link, addToast } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../contexts/auth-context';
 
-/**
- * LoginPage component handles user authentication
- * 
- * This component:
- * - Renders a login form
- * - Validates user input
- * - Calls the authentication service
- * - Redirects to dashboard on success
- * 
- * For Clerk integration:
- * - Replace the form with Clerk's <SignIn /> component
- * - Or use Clerk's useSignIn hook with a custom form
- */
 const LoginPage: React.FC = () => {
-  // Form state
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
-  const [rememberMe, setRememberMe] = React.useState(false);
   
-  // Auth context and routing
   const { login } = useAuth();
   const history = useHistory();
 
-  /**
-   * Handles form submission for login
-   * 
-   * For Clerk integration:
-   * - Replace with Clerk's signIn method
-   * - Handle authentication flow according to Clerk's documentation
-   * 
-   * @param e - Form submit event
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form inputs
     if (!email || !password) {
       addToast({
         title: "Error",
@@ -52,26 +26,17 @@ const LoginPage: React.FC = () => {
 
     try {
       setIsLoading(true);
-      
-      // Call the login method from auth context
-      // REPLACE THIS: For Clerk integration, use Clerk's signIn method
-      // Example: await clerk.signIn.create({ identifier: email, password });
       await login(email, password);
-      
-      // Show success message
       addToast({
         title: "Success",
         description: "You have successfully logged in",
         severity: "success",
       });
-      
-      // Redirect to dashboard
       history.push('/dashboard');
-    } catch (error) {
-      // Show error message
+    } catch (error: any) {
       addToast({
         title: "Error",
-        description: "Invalid email or password",
+        description: error.message || "Invalid email or password",
         severity: "danger",
       });
     } finally {
@@ -95,6 +60,7 @@ const LoginPage: React.FC = () => {
               placeholder="Enter your email"
               value={email}
               onValueChange={setEmail}
+              autoComplete="email"
               startContent={
                 <Icon icon="lucide:mail" className="text-default-400 text-lg" />
               }
@@ -107,22 +73,12 @@ const LoginPage: React.FC = () => {
               placeholder="Enter your password"
               value={password}
               onValueChange={setPassword}
+              autoComplete="current-password"
               startContent={
                 <Icon icon="lucide:lock" className="text-default-400 text-lg" />
               }
               isRequired
             />
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-              <Checkbox 
-                isSelected={rememberMe} 
-                onValueChange={setRememberMe}
-                size="sm"
-              >
-                Remember me
-              </Checkbox>
-              <Link href="#" size="sm">Forgot password?</Link>
-            </div>
 
             <Button 
               type="submit" 
@@ -133,34 +89,6 @@ const LoginPage: React.FC = () => {
               Sign In
             </Button>
           </form>
-
-          <div className="mt-4 sm:mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs sm:text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button 
-                variant="bordered" 
-                className="w-full"
-                startContent={<Icon icon="logos:google-icon" className="text-lg" />}
-              >
-                Google
-              </Button>
-              <Button 
-                variant="bordered" 
-                className="w-full"
-                startContent={<Icon icon="logos:github-icon" className="text-lg" />}
-              >
-                GitHub
-              </Button>
-            </div>
-          </div>
 
           <p className="text-center mt-6 sm:mt-8 text-xs sm:text-sm text-gray-600">
             Don't have an account?{' '}

@@ -1,65 +1,157 @@
 import express from 'express';
-import cors from 'cors';
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+
 app.use(cors());
+app.use(express.json());
 
-let otpStore = {};
+const users = [];
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  }
-});
-
-app.post('/send-otp', async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  otpStore[email] = otp;
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password } = req.body;
 
   try {
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: email,
-      subject: 'Your OTP for MentorHub',
-      html: `<p>Your OTP is: <strong>${otp}</strong></p>`
+    let user = users.find(user => user.email === email);
+    if (user) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = {
+      id: users.length + 1,
+      name,
+      email,
+      password: hashedPassword,
+      role: 'mentee', // Default role to mentee
+    };
+
+    users.push(newUser);
+
+    const payload = {
+      user: {
+        id: newUser.id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token, user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role } });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = users.find(user => user.email === email);
+    if (!user) {
+      return res.status(400).json({ msg: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: 'Invalid credentials' });
+    }
+
+    const payload = {
+      user: {
+        id: user.id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: 3600 },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+app.post('/api/auth/send-otp', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = users.find(user => user.email === email);
+    if (!user) {
+      return res.status(400).json({ msg: 'User not found' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 3600000; // 1 hour
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_ID,
+        pass: process.env.GMAIL_PASS,
+      },
     });
 
-    res.status(200).json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('Email sending error:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    const mailOptions = {
+      from: process.env.GMAIL_ID,
+      to: email,
+      subject: 'Your OTP for MentorHub',
+      text: `Your OTP is ${otp}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ msg: 'OTP sent to email' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
   }
 });
 
-app.post('/verify-otp', (req, res) => {
+app.post('/api/auth/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
-  if (!email || !otp) {
-    return res.status(400).json({ error: 'Email and OTP are required' });
-  }
+  try {
+    const user = users.find(user => user.email === email);
+    if (!user) {
+      return res.status(400).json({ msg: 'User not found' });
+    }
 
-  if (otpStore[email] === otp) {
-    delete otpStore[email];
-    res.status(200).json({ message: 'OTP verified successfully' });
-  } else {
-    res.status(400).json({ error: 'Invalid OTP' });
+    if (user.otp !== otp || user.otpExpires < Date.now()) {
+      return res.status(400).json({ msg: 'Invalid or expired OTP' });
+    }
+
+    user.otp = undefined;
+    user.otpExpires = undefined;
+
+    res.json({ msg: 'OTP verified successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`✅ Server is running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

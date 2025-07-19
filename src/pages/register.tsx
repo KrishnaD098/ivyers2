@@ -1,131 +1,22 @@
 import React from 'react';
 import { useHistory, Link as RouterLink } from 'react-router-dom';
-import { Card, CardBody, Input, Button, Link, RadioGroup, Radio, addToast } from '@heroui/react';
+import { Card, CardBody, Input, Button, Link, addToast } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../contexts/auth-context';
 
-/**
- * RegisterPage component handles user registration
- * 
- * This component:
- * - Renders a registration form
- * - Validates user input
- * - Calls the registration service
- * - Redirects to dashboard on success
- * 
- * For Clerk integration:
- * - Replace the form with Clerk's <SignUp /> component
- * - Or use Clerk's useSignUp hook with a custom form
- */
 const RegisterPage: React.FC = () => {
-  // Form state
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
-  const [role, setRole] = React.useState<'mentor' | 'mentee'>('mentee');
   const [isLoading, setIsLoading] = React.useState(false);
-  const [otp, setOtp] = React.useState('');
-  const [isOtpSent, setIsOtpSent] = React.useState(false);
-  const [isOtpVerified, setIsOtpVerified] = React.useState(false);
-  const [generatedOtp, setGeneratedOtp] = React.useState('');
 
-
-  // Auth context and routing
   const { register } = useAuth();
   const history = useHistory();
 
-  const handleSendOtp = async () => {
-    if (!email) {
-      addToast({
-        title: "Error",
-        description: "Please enter your email address",
-        severity: "danger",
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:3001/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setIsOtpSent(true);
-        addToast({
-          title: "OTP Sent",
-          description: "An OTP has been sent to your email address.",
-          severity: "success",
-        });
-      } else {
-        addToast({
-          title: "Error",
-          description: "Failed to send OTP",
-          severity: "danger",
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      addToast({
-        title: "Error",
-        description: "Failed to send OTP",
-        severity: "danger",
-      });
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/verify-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, otp }),
-      });
-
-      if (response.ok) {
-        setIsOtpVerified(true);
-        addToast({
-          title: "Success",
-          description: "OTP verified successfully",
-          severity: "success",
-        });
-      } else {
-        addToast({
-          title: "Error",
-          description: "Invalid OTP",
-          severity: "danger",
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      addToast({
-        title: "Error",
-        description: "Failed to verify OTP",
-        severity: "danger",
-      });
-    }
-  };
-
-  /**
-   * Handles form submission for registration
-   * 
-   * For Clerk integration:
-   * - Replace with Clerk's signUp method
-   * - Handle user creation flow according to Clerk's documentation
-   * - Add custom user metadata for the mentor/mentee role
-   * 
-   * @param e - Form submit event
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate form inputs
+
     if (!name || !email || !password || !confirmPassword) {
       addToast({
         title: "Error",
@@ -135,7 +26,6 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    // Validate password match
     if (password !== confirmPassword) {
       addToast({
         title: "Error",
@@ -145,45 +35,19 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (!isOtpVerified) {
-      addToast({
-        title: "Error",
-        description: "Please verify your email address",
-        severity: "danger",
-      });
-      return;
-    }
-
     try {
       setIsLoading(true);
-      
-      // Call the register method from auth context
-      // REPLACE THIS: For Clerk integration, use Clerk's signUp method
-      // Example: 
-      // const signUpResult = await clerk.signUp.create({
-      //   firstName: name.split(' ')[0],
-      //   lastName: name.split(' ').slice(1).join(' '),
-      //   emailAddress: email,
-      //   password,
-      // });
-      // await signUpResult.createdSessionId;
-      // await clerk.user.update({ publicMetadata: { role } });
-      await register(name, email, password, role);
-      
-      // Show success message
+      await register(name, email, password, 'mentee'); // Default role to mentee
       addToast({
         title: "Success",
-        description: "Your account has been created successfully",
+        description: "Your account has been created. Please check your email to verify your account.",
         severity: "success",
       });
-      
-      // Redirect to dashboard
       history.push('/dashboard');
-    } catch (error) {
-      // Show error message
+    } catch (error: any) {
       addToast({
         title: "Error",
-        description: "Failed to create account",
+        description: error.message || "Failed to create account",
         severity: "danger",
       });
     } finally {
@@ -212,40 +76,18 @@ const RegisterPage: React.FC = () => {
               isRequired
             />
             
-            <div className="flex items-end gap-2">
-              <Input
-                type="email"
-                label="Email"
-                placeholder="Enter your email"
-                value={email}
-                onValueChange={setEmail}
-                startContent={
-                  <Icon icon="lucide:mail" className="text-default-400 text-lg" />
-                }
-                isRequired
-              />
-              <Button onClick={handleSendOtp} disabled={isOtpSent}>
-                Send OTP
-              </Button>
-            </div>
-
-            {isOtpSent && (
-              <div className="flex items-end gap-2">
-                <Input
-                  label="OTP"
-                  placeholder="Enter the OTP"
-                  value={otp}
-                  onValueChange={setOtp}
-                  startContent={
-                    <Icon icon="lucide:key" className="text-default-400 text-lg" />
-                  }
-                  isRequired
-                />
-                <Button onClick={handleVerifyOtp} disabled={isOtpVerified}>
-                  Verify
-                </Button>
-              </div>
-            )}
+            <Input
+              type="email"
+              label="Email"
+              placeholder="Enter your email"
+              value={email}
+              onValueChange={setEmail}
+              autoComplete="email"
+              startContent={
+                <Icon icon="lucide:mail" className="text-default-400 text-lg" />
+              }
+              isRequired
+            />
             
             <Input
               type="password"
@@ -253,6 +95,7 @@ const RegisterPage: React.FC = () => {
               placeholder="Create a password"
               value={password}
               onValueChange={setPassword}
+              autoComplete="new-password"
               startContent={
                 <Icon icon="lucide:lock" className="text-default-400 text-lg" />
               }
@@ -265,62 +108,22 @@ const RegisterPage: React.FC = () => {
               placeholder="Confirm your password"
               value={confirmPassword}
               onValueChange={setConfirmPassword}
+              autoComplete="new-password"
               startContent={
                 <Icon icon="lucide:lock" className="text-default-400 text-lg" />
               }
               isRequired
             />
 
-            <div>
-              <label className="block text-xs sm:text-sm font-medium mb-2">I want to join as a:</label>
-              <RadioGroup 
-                orientation="horizontal" 
-                value={role} 
-                onValueChange={setRole as (value: string) => void}
-              >
-                <Radio value="mentee">Mentee</Radio>
-                <Radio value="mentor">Mentor</Radio>
-              </RadioGroup>
-            </div>
-
             <Button 
               type="submit" 
               color="primary" 
               className="w-full"
               isLoading={isLoading}
-              disabled={!isOtpVerified}
             >
               Create Account
             </Button>
           </form>
-
-          <div className="mt-4 sm:mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs sm:text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button 
-                variant="bordered" 
-                className="w-full"
-                startContent={<Icon icon="logos:google-icon" className="text-lg" />}
-              >
-                Google
-              </Button>
-              <Button 
-                variant="bordered" 
-                className="w-full"
-                startContent={<Icon icon="logos:github-icon" className="text-lg" />}
-              >
-                GitHub
-              </Button>
-            </div>
-          </div>
 
           <p className="text-center mt-6 sm:mt-8 text-xs sm:text-sm text-gray-600">
             Already have an account?{' '}

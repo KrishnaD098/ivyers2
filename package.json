@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noCheck && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:server": "node server.js"
   },
   "dependencies": {
     "@heroui/react": "2.7.6",
@@ -15,8 +16,14 @@
     "@iconify/react": "latest",
     "@internationalized/date": "3.7.0",
     "@react-aria/i18n": "3.12.5",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.0",
+    "express": "^5.1.0",
     "framer-motion": "^11.18.2",
+    "googleapis": "^153.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.3",
     "nodemailer": "^7.0.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -24,13 +31,19 @@
     "recharts": "2.12.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "10.4.20",
+    "nodemon": "^3.1.10",
     "postcss": "8.4.49",
     "tailwindcss": "3.4.17",
+    "ts-node": "^10.9.2",
     "typescript": "5.7.3",
     "vite": "^6.0.11"
   }
